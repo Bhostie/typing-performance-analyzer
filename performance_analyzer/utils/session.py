@@ -24,9 +24,13 @@ class SessionUtil:
             prev_item = data[i - 1]
             current_item = data[i]
 
+            # AWARE-fix: treat None like "" so missing before_text doesn't crash.
+            cur_before = current_item.get("before_text") or ""
+            prev_current = prev_item.get("current_text") or ""
+
             new_session = (
-                    current_item["before_text"] == ""
-                    and StringUtil.remove_braces(prev_item["current_text"]) != ""
+                    cur_before == ""
+                    and StringUtil.remove_braces(prev_current) != ""
             )
 
             if new_session:
@@ -43,16 +47,30 @@ class SessionUtil:
 
     @staticmethod
     def get_final_text(data_list) -> str:
-        current_text = data_list[len(data_list) - 1]['current_text']
+        # AWARE-fix: guard against empty list.
+        if not data_list:
+            return ""
+        current_text = data_list[len(data_list) - 1].get('current_text') or ''
         return StringUtil.remove_braces(current_text)
 
     @staticmethod
     def get_initial_text(data_list) -> str:
-        return data_list[0]['before_text']
+        # AWARE-fix: empty-list guard + strip braces for symmetry with
+        # get_final_text. Without this, a [-wrapped before_text would
+        # make initial_text artificially longer than final_text.
+        if not data_list:
+            return ""
+        before_text = data_list[0].get('before_text') or ''
+        return StringUtil.remove_braces(before_text)
 
     @staticmethod
     def get_text_len(data_list) -> int:
-        return len(SessionUtil.get_final_text(data_list)) - len(SessionUtil.get_initial_text(data_list))
+        # AWARE-fix: clamp at 0. A session that net-shrinks (pure deletes
+        # or backspacing past the initial text) contributes 0 "produced
+        # characters", not a negative number. Without this clamp,
+        # get_overall_len can go negative, producing negative KSPC.
+        raw = len(SessionUtil.get_final_text(data_list)) - len(SessionUtil.get_initial_text(data_list))
+        return max(0, raw)
 
     @staticmethod
     def get_overall_len(sessions: List[Dict]) -> int:

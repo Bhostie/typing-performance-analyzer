@@ -1,5 +1,6 @@
 from performance_analyzer.utils.string import StringUtil
 from performance_analyzer.utils.session import SessionUtil
+from performance_analyzer.utils.bounds import SANITY_BOUNDS
 
 MILLISECONDS = 1000.0
 WORD_PER_MINUTE = 12
@@ -26,14 +27,26 @@ class TypingSpeedCalculator:
         final_character_count = 0
 
         for session in self.sessions:
-            final_character_count += len(SessionUtil.get_final_text(session)) - len(SessionUtil.get_initial_text(session))
+            # AWARE-fix: use SessionUtil.get_text_len so pure-delete sessions
+            # contribute 0 instead of a negative delta. Keeps wpm() consistent
+            # with kspc(), which already sums via SessionUtil.get_overall_len.
+            final_character_count += SessionUtil.get_text_len(session)
 
         duration = self.duration - (interrupted_time / MILLISECONDS)
 
         if duration <= 0 or final_character_count <= 0:
             return 0
 
-        return (final_character_count - 1) / duration * WORD_PER_MINUTE
+        wpm_value = (final_character_count - 1) / duration * WORD_PER_MINUTE
+
+        # AWARE-fix: clamp to physically plausible range (matches v3).
+        # Values outside this range are almost always snapshot artefacts
+        # (stale before_text, autocomplete bursts) rather than real typing.
+        lo, hi = SANITY_BOUNDS["wpm"]
+        if wpm_value < lo or wpm_value > hi:
+            return 0
+
+        return wpm_value
 
     def ksps(self, interrupted_time:int = 0) -> float:
         """
@@ -48,7 +61,14 @@ class TypingSpeedCalculator:
         if duration <= 0:
             return 0
 
-        return (len(self.data_list) - 1) / duration
+        ksps_value = (len(self.data_list) - 1) / duration
+
+        # AWARE-fix: clamp to physically plausible range (matches v3).
+        lo, hi = SANITY_BOUNDS["ksps"]
+        if ksps_value < lo or ksps_value > hi:
+            return 0
+
+        return ksps_value
 
     def get_duration(self):
         """

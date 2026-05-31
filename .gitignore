@@ -1,2 +1,8 @@
 .idea
 *.pyc
+pyproject.toml
+.vscode/launch.json
+performance_analyzer.egg-info/dependency_links.txt
+performance_analyzer.egg-info/PKG-INFO
+performance_analyzer.egg-info/SOURCES.txt
+performance_analyzer.egg-info/top_level.txt

@@ -2,6 +2,7 @@ import string
 from performance_analyzer.utils.string import StringUtil
 from performance_analyzer.spellcheck import SpellChecker
 from performance_analyzer.utils.session import SessionUtil
+from performance_analyzer.utils.bounds import SANITY_BOUNDS
 from lingua import Language, LanguageDetectorBuilder
 
 
@@ -57,8 +58,17 @@ class ErrorRateCalculator:
 
         if transcribed_text_length == 0:
             return 0
-        else:
-            return session_size / transcribed_text_length
+
+        kspc_value = session_size / transcribed_text_length
+
+        # AWARE-fix: clamp to physically plausible range (matches v3).
+        # KSPC < 0.05 or > 20 indicates a snapshot/paste artefact, not
+        # real typing efficiency.
+        lo, hi = SANITY_BOUNDS["kspc"]
+        if kspc_value < lo or kspc_value > hi:
+            return 0
+
+        return kspc_value
 
     def error_rate(self) -> float:
         """
@@ -81,7 +91,10 @@ class ErrorRateCalculator:
         if text_length == 0:
             return 0
 
-        return overall_diff / (len(self.final_text) - len(self.initial_text))
+        # AWARE-fix: use the session-aware denominator (already computed
+        # above) instead of the raw final/initial delta, which can be
+        # negative on backspace-heavy windows.
+        return overall_diff / text_length
 
     def error_msd(self) -> float:
         """
