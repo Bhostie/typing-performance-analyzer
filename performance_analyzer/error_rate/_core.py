@@ -57,16 +57,19 @@ class ErrorRateCalculator:
         transcribed_text_length = SessionUtil.get_overall_len(self.sessions) + additional_characters
 
         if transcribed_text_length == 0:
-            return 0
+            # AWARE-fix (Option A): no transcribed characters -> KSPC is
+            # undefined (0/0). Return NaN (invalid sentinel) instead of 0 so
+            # downstream pipelines drop/impute it rather than reading "0 KSPC".
+            return float("nan")
 
         kspc_value = session_size / transcribed_text_length
 
-        # AWARE-fix: clamp to physically plausible range (matches v3).
-        # KSPC < 0.05 or > 20 indicates a snapshot/paste artefact, not
-        # real typing efficiency.
+        # AWARE-fix: KSPC < 0.05 or > 20 indicates a snapshot/paste artefact,
+        # not real typing efficiency. Return NaN (not 0) so it is explicitly
+        # invalid downstream.
         lo, hi = SANITY_BOUNDS["kspc"]
         if kspc_value < lo or kspc_value > hi:
-            return 0
+            return float("nan")
 
         return kspc_value
 

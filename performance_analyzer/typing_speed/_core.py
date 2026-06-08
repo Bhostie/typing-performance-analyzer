@@ -35,16 +35,20 @@ class TypingSpeedCalculator:
         duration = self.duration - (interrupted_time / MILLISECONDS)
 
         if duration <= 0 or final_character_count <= 0:
-            return 0
+            # AWARE-fix (Option A): a window with no usable duration or no net
+            # produced characters cannot yield a meaningful typing speed.
+            # Return NaN (invalid sentinel) instead of 0 so downstream
+            # pipelines drop/impute it rather than treating it as "0 WPM".
+            return float("nan")
 
         wpm_value = (final_character_count - 1) / duration * WORD_PER_MINUTE
 
-        # AWARE-fix: clamp to physically plausible range (matches v3).
-        # Values outside this range are almost always snapshot artefacts
+        # AWARE-fix: out-of-range values are almost always snapshot artefacts
         # (stale before_text, autocomplete bursts) rather than real typing.
+        # Return NaN (not 0) so they are explicitly invalid downstream.
         lo, hi = SANITY_BOUNDS["wpm"]
         if wpm_value < lo or wpm_value > hi:
-            return 0
+            return float("nan")
 
         return wpm_value
 
@@ -59,14 +63,15 @@ class TypingSpeedCalculator:
         duration = self.duration - (interrupted_time / MILLISECONDS)
 
         if duration <= 0:
-            return 0
+            # AWARE-fix (Option A): no usable duration -> KSPS undefined -> NaN.
+            return float("nan")
 
         ksps_value = (len(self.data_list) - 1) / duration
 
-        # AWARE-fix: clamp to physically plausible range (matches v3).
+        # AWARE-fix: out-of-range -> NaN (invalid sentinel), not 0.
         lo, hi = SANITY_BOUNDS["ksps"]
         if ksps_value < lo or ksps_value > hi:
-            return 0
+            return float("nan")
 
         return ksps_value
 

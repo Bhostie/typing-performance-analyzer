@@ -1,9 +1,12 @@
 # AWARE-fix: shared sanity bounds for the typing metrics.
 # Mirrors src/typing_metrics_v3.py SANITY_BOUNDS so legacy and v3 agree
 # on what counts as a physically plausible value. When a metric falls
-# outside these bounds we treat it as invalid and return 0 (keeping the
-# library's existing return type; downstream pipelines decide whether
-# to drop or impute these zeros).
+# outside these bounds (or cannot be computed, e.g. zero duration / zero
+# transcribed length) the calculators return NaN (an explicit invalid
+# sentinel) instead of 0. This prevents impossible values from silently
+# masquerading as real "0 WPM/KSPS/KSPC" targets; downstream pipelines
+# decide whether to drop or impute these NaNs (e.g. eda._outlier_mask
+# treats NaN targets as removable).
 from typing import Dict, Tuple
 
 SANITY_BOUNDS: Dict[str, Tuple[float, float]] = {
